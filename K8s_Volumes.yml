@@ -1,0 +1,244 @@
+K8s Volumes -:
+-------------------
+ > On-disk files in a container are ephemeral, which presents some problems for non-trivial applications when running in containers.
+ > One problem is when a container crashes we loss of files inside a container and kubelet restarts the container but with a clean state.
+ > A second problem occurs when sharing files between containers running together in a Pod. 
+ > The Kubernetes volume abstraction solves both of these problems.
+ > it's a storage driver which will be used to map the content.
+ > It's a piece of storage where our container wil mounted with that storage, where it'll maintaing the data.
+ 
+ Types of volumes -:
+ --------------------------
+ There are different trypes of volumes.
+ 
+ If it's a onprem/self managed k8s Cluster -:
+ -----------------------------------------------------
+ Hostpath Volumes -: It'll use host(node) file system. we can mount container directory with host(node) file system.
+ emptryDir -: It's like a Temparory Storage. For ex if your container is not resheduled. if our container is gone but we have a pod so we have a pod, if pod also goen then we don't have a data. 
+ Nfs -: network file system. where we have a seperate server that manages the file system we can use nfs. 
+ elasticBlockstore -: 
+ 
+If it's a managed k8s Cluster (azure,aws,gcp) -:
+-------------------------------------------------------------
+ google/aws/PersistentDisk
+ AzureDisk
+ -----------------------------------------------------------------------------------------------------------------------------------------
+ > ConfigMap -: it's something used to attach some configurations to the pod in a key:value pair. configmap we can use as volumes also.
+ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Note -:
+-------
+> We can use these above volumes directly to our pod but k8s is not going to manage the state of the volume if we  use this outside of the pod directly.
+> If we mount those volumes directly to the pod  the volume informatiion will not be maintained outside of our pod lifecycle.
+> Bcs the storage is directly associated with our pods and k8s will not maintain the volume informatiion, like how many volumes we have and all those stuff.
+> So for that we have a PV .
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+what is PV -:
+-----------------
+> The k8s will maintain the volume information like type of volume we using, and who claim that volume.
+> The k8s cluster will maintain the volume informatiion.
+> PV is a piece of storage in a cluster.
+> PV will provide the storage resources to the k8s objects.
+
+These PVs provisioned in two ways  -:
+--------------------------------------------------
+    1)  Static Volumes   -: which is a created  manually. as a k8's admin we can create pv manually. which can be used/claimed by pods whatever required some storage.
+    2) Dynamic Volumes   -: Here we no need to create pv object manually. The implementation of dynamic volume provisioning is based on the API object StorageClass.
+    For Dynamic Volumes First we need to create storage class and we need to provide that name to pvc manifest.
+
+What is Storageclass(Volume Provisioner) -:
+------------------------------------------
+> A StorageClass provides a way for administrators to describe the "classes" of storage they offer.
+> Different classes might map to quality-of-service levels, or to backup policies, or to arbitrary policies determined by the cluster administrators. 
+> It's a piece of code(driver) which will create volumes(pv) whenever we have a pvc request and we don't have pv in available in the cluster.
+> Each StorageClass contains the fields provisioner, parameters, and reclaimPolicy, which are used when a PersistentVolume belonging to the class needs to be dynamically provisioned.
+
+Recommended way -:
+----------------------------
+> Even if using Hostpath or NFS or any type of volume also first we have to create a PV  with that storage type (weather it's a Hostpath or nfs) then our pod will claim that volume with help of PVC.
+
+Doc for Deploy a smaple app -:
+---------------------------------------
+ > I deploy two sample applications One is for Frontend app(Springboot) and another one for backend(DB)(MongoDB).
+ > Springboot app it has a Frontend(UI) and Middle (Java Codhas e) and MongoDB it has a backend DB.
+
+Types of Applications -:
+-------------------------------
+Actually we have two types of applications 
+1) Statefull application  2) Stateless application
+----------------------------------------------------------
+1) Statefull application -:
+------------------------------
+> The Backend application is a statefull application where we are maintaining state about our application data. that's running as a container.
+> If the container goes down we need to recreate and carry the state. otherwise we will lose our data.
+> So we are using volumes with statefull application.
+
+2) Stateless application -:
+----------------------------------
+> The Frontend application is stateless application bcs we are not storing anything if my frontend container goes down i just need to replicate that container. i no need to worry about the data.
+> it doesn't have any state. i just need to replicate that application.
+> If we wanna maintain some important directory/folder or if you wanna mount with some imp directory/folder of frontend application also we can use the volumes.
+> Even if we lose the frontend application container also we no need to worry we can replicate.
+
+If we wanna deploy application what we require -:
+------------------------------------------------------------------
+> For deploy an application we need an DockerImage right.
+> So for this implimentation im using Springboot-mongo image.
+
+What are the objects/resources we need to create to deploy this application -:
+------------------------------------------------------------------------------------------------------
+> For that i'm using Controller for mananaging the pods and Services
+
+Deploy a sample app -:
+-----------------------------
+# Complete Manifest Where in single yml we defined Deployment & Service for SpringApp & PVC(with default  StorageClass),ReplicaSet & Service For Mongo.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spring_boot_app_deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: springapppod
+  template:
+    metadata:
+      name: springapppod
+      labels:
+        app: springapppod
+    spec:
+      containers:
+      - name: springappcontainer
+        image: docker/spring-boot-mongo
+        ports:
+        - containerPort: 8080
+        env:
+         - name: MONGO_DB_HOSTNAME
+          value: mongodb
+        - name: MONGO_DB_USERNAME
+          value: testdb
+        - name: MONGO_DB_PASSWORD
+          value: tetsdb@135
+       
+
+How to pass an Env Variables -:
+------------------------------------------
+> By using env it has some name and values... for now we give name as  MONGO_DB_HOSTNAME, The host name is basically a Service name.(DB service name).
+> So now one application try to commynicate from one application to another application we need an Servcie right.
+> So for connecting to the mongo db database i provided the service name as a (mongo) under env values.
+> Provide MONGO_DB_USERNAME and MONGO_DB_PASSWORD and it's values.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+I wanna Access my Frontend application from the browser So what we have to do -:
+-------------------------------------------------------------------------------------------------------------
+> For that we need to create a service for that Frontend application.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: springappsvc
+spec:
+  selector:
+    app: springapppod
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: LoadBalancer
+ -----------------------------------------------------------------------------------------------------------------------------------------
+ I wanna run my DB as a Pod -: 
+ ----------------------------------------
+ > For that we actually use an object/kind called statefullset but here i'm using ReplicaSet as a object/kind. with Volumes.
+ > bcs if i not mention any volume, if our DB pod is recreated it's not maintain any data. so we will lose the data. 
+ ---------------------------------------------------------------------------------------------------------------------------------------------------
+ ------------------------------------------------------------------------------------------------------------------------------------------------------
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodbpvc 
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: mongodbrs
+spec:
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+     metadata:
+       name: mongodbpod
+       labels:
+         app: mongodb
+     spec:
+       volumes:
+       - name: pvc
+         persistentVolumeClaim:
+           claimName: mongodbpvc     
+       containers:
+       - name: mongodbcontainer
+         image: mongo
+         ports:
+         - containerPort: 27017
+         env:
+         - name: MONGO_INITDB_ROOT_USERNAME
+           value: tetsdd
+         - name: MONGO_INITDB_ROOT_PASSWORD
+           value: tetsdb@135
+         volumeMounts:
+         - name: pvc
+           mountPath: /data/db   
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------           
+Note -:
+> Our Frontend app env variable values and Our Backend DB values should be match bcs if those values will not be matched The authontication will failed.
+---->
+> For this mongo DB also we need to create a Service. with matching labels of DB pods.
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongosvc
+spec:
+  type: ClusterIP
+  selector:
+    app: mongodb
+  ports:
+  - port: 27017
+    targetPort: 27017
+ -----------------------------------------------
+ Note-:
+ > Here i create db ppod with name of mongodb so i create a service with the same name.
+> Front and application i passing host name as a mongodb so with that name(mongodb) only i create a Db service
+> I create a service type as Cluster ip.
+> Here i use port as 27017 bcs this frontend application will try to connect as mongodb:27017(Servicename and service port)
+> I mentioned my ContainerPort of a DB as a targetPort. bcs it's not a frontend application, this service for a DB. 
+> So we use  Port and targetPort as A 27017 for DB service.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+When we deploy any application as containers what things we should Consider -:
+----------------------------------------------------------------------------------------------------------
+> we shouldn't do any hard code any configurations. which are going to be change for each and every environment.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Commands i used for this deploymnet -:
+--------------------------------------
+
+kubectl apply -f app.yml
+kubectl apply -f appsvc.yml
+kubectl apply -f db.yml
+kubectl apply -f dbsvc.yml
+kubectl get deployment
+kubectl get svc
+kubectl get all --all
+kubectl get rs
+kubectl get pods -o wide
+kubectl get pv
+kubectl get pvc
+kubectl get storageclass
+kubectl describe pods  

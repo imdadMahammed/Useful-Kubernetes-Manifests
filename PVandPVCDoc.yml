@@ -1,0 +1,101 @@
+#what is PV -:
+#-----------------
+> The k8s will maintain the volume information like type of volume we using, and who claim that volume.
+> The k8s cluster will maintain the volume informatiion.
+> PV is a piece of storage in a cluster.
+> PV will provide the storage resources to the k8s objects.
+
+#These PVs provisioned in two ways  -:
+#--------------------------------------------------
+    1)  Static Volumes   -: which is a created  manually. as a k8's admin we can create pv manually. which can be used/claimed by pods whatever required some storage.
+    2) Dynamic Volumes   -: Here we no need to create pv object manually. The implementation of dynamic volume provisioning is based on the API object StorageClass.
+    For Dynamic Volumes First we need to create storage class and we need to provide that name to pvc manifest.
+
+#What is Storageclass(Volume Provisioner) -:
+#------------------------------------------
+# > A StorageClass provides a way for administrators to describe the "classes" of storage they offer.
+# > Different classes might map to quality-of-service levels, or to backup policies, or to arbitrary policies determined by the cluster administrators.
+# > It's a piece of code(driver) which will create volumes(pv) whenever we have a pvc request and we don't have pv in available in the cluster.
+# > Each StorageClass contains the fields provisioner, parameters, and reclaimPolicy, which are used when a PersistentVolume belonging to the class needs to be dynamically provisioned.
+# > If we using any EKS/Aks clusters we no need to create any provisioners(storage class) by default they provide a storage class.
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#1) Static Volumes-:
+#------------------
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pvforhostpath
+spec:
+  storageClassName: manual
+  capacity: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  hostpath:
+    path: "/kube/volume
+#If we wanna use NFS volume remove the hostpath or create another volume with nfs
+# nfs:
+#  server: 172.10.2.3 (provide NFS server ip)
+#  path: "/mnt/share" (provide the path which we created on nfs server) 
+#.........................................................................................................................................................................................................
+
+# > we have different types of access modes in pv 1) ReadWriteOnce 2) ReadWriteMany 3) ReadOnlyMany.#
+# > ReadWriteOnce -> Only one node/pod can read and write the data.
+# > ReadWriteMany -> Multiple Nodes/pods can read and write data.
+# > ReadOnlyMany  -> Many Nodes/pods can ReadOnly volumes.
+# > we create a volume but how can we request a volume for that we need to create a pvc.
+# > we can create a lebels for a selectors also.
+
+# > PV has reclaim policies -:
+#------------------------------
+# > pv has 3 types of reclaim policies -: 1) Retain 2) Recycle 3) Delete.
+
+# > Retain -: When the pvc is deleted, the pv still exists and teh volume is considered"relesed". but it's not yet available for another claim.
+#   bcs the previous claim data remains on the volumes. an a administrator we can manually reclaim teh volume.
+
+# > Recycle -: When the PVC is deleted the volume remains but it'll delete all the data with in that storage. So it'll available for another claim.
+
+# > Delete -:  Actually pvc is associated with pv if my reclaim policy is delete my pv also deleted. 
+.........................................................................................................................................................................................................
+
+# > create a pvc -:
+-------------------
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodbpvc
+spec:
+  storageClassName: manual 
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+
+# how the pvc will associated with pv -:
+----------------------------------------
+# The claim will associated with volume based on which perameters so what perameters will associate. 
+# So the pvc will associate with accessmodes and storage capacity requests.
+# So now i created the volumeclaim name with *(mongodbpvc)*.
+# This name (mongodbpvc) i'll associated with my mongodb db manifest(k8s_Volumes.yml) inside volume section.
+# How to delete a pvc first we need to delete the pod then only we can delete the pvc.
+--------------------------------------------------------------------------------------------------------------------------------------------
+#Recommended way -:
+-------------------
+# > Even if using Hostpath or NFS or any type of volume also first we have to create a PV  wi>
+--------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Dynamic Volumes -:
+-------------------
+# > now i'm not create pv manually i just create pvc manually and pv will be automatically created.
+# > For ex already we have a NFS server now we deploy the NFS provisioner.
+# > Provisioner is ntg but a some kind of code but if you use eks/aks k8s clusters we no need to create a provisioners by default provisioners are available in that cluster.
+# > If we use eks cluster by default we get a EBS provisioner (The storage class).
+# > For creating a Dynamic volumes also first we need to create a ServiceAccount then attach a Clusterrole(Permissions).
+# > I created a NFS Storage class with Service account and I Provide that link in below.
+
+# >  https://github.com/bLakshmankumar/HPA_Deployment/blob/main/nfsstorageclass.yml  <
+-------------------------------------------------------------------------------------------

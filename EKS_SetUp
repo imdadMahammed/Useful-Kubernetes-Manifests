@@ -1,0 +1,114 @@
+#                                              					EKS 
+#					                                      -------
+# Selfmanaged & Managed k8s Cluster -:
+#---------------------------------------------
+# How many ways to setup a k8s Clusters -:
+# ----------------------------------------------------
+# Using Kubeadm -: Selfmanaged Cluster.
+# Using KOPs -: k8s operations is a software using which we can setup production ready highly available k8s clusters. 
+#                       Kops will create a 2 launch configurations one for master and one for worker & ASG (1 group for master and 1 group for workers) in Cloud (AWS) for master and workers.
+#                       Master group is use master Launch Configuraion and worker Group is use worker Launch Configuraion.
+					   
+# Using EKS/AKS -: The Control plane is completely managed by provider(AWS).
+
+# We have two types of k8s clusters -:
+# -----------------------------------------------
+
+# 1) Selfmanaged k8s cluster -:
+# ------------------------------------
+# > This type of clusters are created by us and managed by users/us.
+# > Actually we have dif types of services NodePort ( ClusterIP, LoadBalancer, Headless service(clusterip:none)).
+# > In managed services we can easily use ClusterIP, NodePort services easily but it's not a good practice for enduser to access the services by using node port/ip. this is good for internal access.
+# > The best practice is use loadbalancer for enduser access.
+# > In a self managed k8s cluster it's not an easy way to setup a loadbalancer.
+# > Here we can't scaleup our cluster.
+# 
+# 2) Managed K8s Clusters -:
+# ---------------------------------
+# > Here Cloud providers will manages the clusters (like EKS, AKS, GKE).
+# > The provider will responsible to managed by provider. and we can integrate with other cloud services like (storage services like EBS, ELB).
+# > If we use managed k8s clusters they will provide/create a service Type as a LoadBalancer.
+# > for ex if we use eks we get an external loadbalancer service (ELB).
+# > Here we can scaleup the Cluster also.(EKS)
+# 
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# 
+# EKS -:
+# --------
+# > Amazon Elastic k8s Service(Amazon EKS) it's a fully managed K8s Service.
+# > Eks is the best palce to run k8s applications bcs of it's security, reliability, and scalability.
+# > EKs can be integrated with other AWS services such as ELB, CLoudWatch, IAM, VPC.
+# > Providing a seamless experience to minitor, scale, and loadbalancer to our applications.
+# > EKS runs the k8s control plane across multiple AZ in order to ensures high availability, and it automatically detect and replaces unhealthy master.
+# > It makes it easy for us to run k8s on aws without needing to install, operate, and maintain our own k8s control plane. 
+# > Means we no need to setup/maintain the control plane, all the controll plane components managed by aws.
+# > EKS provides a scalable and highly-available control plane that runs across multiple aws availability zones.
+# > EKS is automatically manages the availability and scalability of the k8s API servers and the etcd persistence layer for each cluster.
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# 
+# Charges of ELK -:
+# -----------------------
+#  > EKS will charge for Controllplane and Worker Nodes. They will charge Controllplane Seperately and Worker Node Seperately.
+#  
+#  > Controllplane Charges + Worker node charges( Based on Instancety[e & Num of nodes).
+#  
+# -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# 
+# Prerequisites for create a EKS Cluster.
+# -----------------------------------------------
+# 1) Aws a/c with admiin privileges.
+# 2) instance to manage/access EKS cluster using kubectl.
+# 3) AWS CLI access to use kubectl Utility.
+#-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#
+# > Step by Step Procedure Using AWS Console -:
+#-----------------------------------------------------------
+# 1) First Create an IAM Role for EKS Cluster. > Select the EKS then choose (EKS-Cluster option) > click on create a role. This IAm Role We will attach to the cluster.
+# 2) Create a Dedicated VPC for EKS Cluster.
+# 3) Create EKS Cluster > Go to Elastic K8s servcies > click on clusters > click on create cluster > provide name > choose version > Choose a service role which we created earlier > provide TAG > click on next.
+#  > Choose VPC which you created for EKS > Choose SG(required ports will be open for cluster communication) > Choose Cluster Endpoinyt access (Public (or) private (or) public/private) >
+#  >  Choose the CNI(Container Networking interfece)( it works like a wave network in selfmanaged k8s cluster). > Choose Configure Logging > Click on create cluster.
+# 4) Create IAM Role For EKS Worker Nodes.
+#   > Amazon EKS worker node policy
+#   > Amazon EKS_CNI_Policy
+#   > AmazonEC2ContainerRegistryReadOnly(In ECR we maintain our docker images If our worker nodes will download the images we give this permission)
+# 5) Create Worker Nodes.
+# 6)
+# What is cluster endpoint access -:
+# -----------------------------------------
+#   >  If i wanna communicate with this API server or i wanna access the API server(cluster). 
+#   > Public -:  If i select public we can communicate with k8s API Outside VPC/Network.
+#   > Private -: If i select pvt we can communicate with k8s API with in the network/VPC.
+#   > Pub/Pvt -: If we select this we can communicate to API server within the vpc and outside the vpc.
+#   
+#  --> We just create a Controllplane this Controlplane(api-server,Etcd) all managed by aws.
+#   
+#> How to access this cluster(ControlPlance) for deploy something what software we required ?
+#----------------------------------------------------------------------------------------------------------------------
+#      > We required a kubectl, this kubectl has kube-configfile this file has the cluster information.(like our api-server details and where api-server is running). But,
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+# > How can we get that kubeconfigfile from EKS(AWS) ?  > With help of AWS CLI.
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#> Now create a client Machine -> launch a t2.medium instance > connect to the server in linux > install kubectl (help of google) > kubectl version > 
+# > install awscli (for accessing the kubeconfig file) > aws configure(provide access key and secret key & choose the region) > aws eks help >,
+# > ( if you wanna list the clusters how many clusters i have i can execute "aws eks list-clusters"), > aws eks update-kubeconfig --name=clustername --region ap-south-1(which region th ecluster is there). 
+# > Now we can see config file generated now. > cat /***/****/.kube/config > now we can see the cluster info & details. 
+# > Now we can able to execute the kubectl commands.(kubectl get nodes, kubectl get pods).
+# ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#  > Now we need to add a worker machines.
+#  --------------------------------------------------------
+#   > Before that first create an One Iam Role for worker machines with Amazon EKS worker node policy, Amazon EKS_CNI_Policy, AmazonEC2ContainerRegistryReadOnly.
+#   > > Go to IAM > Choose EC2 as a common use > Give thoose 3 permissions. > click on create role.
+#   >Go to EKS > Click on clusters > Click on Cluster name > Go to configurations > Click on compute > Click on node group (Top Rightside corner),
+#   > Provide Group name > provide node role(which we create for this) > click on next > set compute & Scaling Configuraion ( AMI type, Capacity Type, Instance type.)
+#   > Desired  size > Group size (min servers & max servers & Desired size) > Specify networking (Choose Subnets) > Choose Key pair > Choose remote access from (ALL or Spec SG),
+#   >  Click on next and click on create nodegroup.
+#   > Using Launch Configuraion it'll create a node groups.
+#   > Now we can execute and see the our nodes. -: kubectl get nodes.
+#   > ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#   > Additional Info -:
+#   > =================
+#   > When we deploy any microservice first we need to check the ns of on which ns it has to deploy 
+#   > How to check our current namespace (or) our current default ns    -: kubectl config view  > we get our current ns informationas 
+#   > How to set specific ns as my current/default ns                   -: kubectl config set-context --current --namespace=ns name (which you wanna make it as a default ns). 
+

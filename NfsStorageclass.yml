@@ -1,0 +1,162 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: nfs-pod-provisioner-sa
+  namespace: kube-system
+---
+kind: ClusterRole # Role of kubernetes
+apiVersion: rbac.authorization.k8s.io/v1 # auth API
+metadata:
+  name: nfs-provisioner-clusterRole
+rules:
+  - apiGroups: [""] # rules on persistentvolumes
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nfs-provisioner-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: nfs-pod-provisioner-sa # defined on top of file
+    namespace: kube-system
+roleRef: # binding cluster role to service account
+  kind: ClusterRole
+  name: nfs-provisioner-clusterRole # name defined in clusterRole
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nfs-pod-provisioner-otherRoles
+  namespace: kube-system
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: nfs-pod-provisioner-otherRoles
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: nfs-pod-provisioner-sa # same as top of the file
+    # replace with namespace where provisioner is deployed
+    namespace: kube-system
+roleRef:
+  kind: Role
+  name: nfs-pod-provisioner-otherRoles
+  apiGroup: rbac.authorization.k8s.io
+  
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-pod-provisioner
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-pod-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nfs-pod-provisioner
+    spec:
+      serviceAccountName: nfs-pod-provisioner-sa # name of service account created in rbac.yaml
+      containers:
+        - name: nfs-pod-provisioner
+          image: rkevin/nfs-subdir-external-provisioner:fix-k8s-1.20
+          volumeMounts:
+            - name: nfs-provisioner-v
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME 
+              value: nfs-provisioner
+                   # SAME AS PROVISONER NAME VALUE IN STORAGECLASS # do not change
+            - name: NFS_SERVER
+              value: 172.31.37.244
+                   # Ip of the NFS SERVER
+            - name: NFS_PATH 
+              value: /mnt/share
+                   # path to nfs directory setup
+      volumes:
+       - name: nfs-provisioner-v # same as volumemouts name
+         nfs:
+           server: 172.31.37.244
+           path:  /mnt/share   
+                # Make sure update your ip address accordingly
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-storageclass # IMPORTANT pvc needs to mention this name
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: nfs-provisioner # name can be anything
+parameters:
+  archiveOnDelete: "false"
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# Here first i create a ServiceAccount(it's like an one user) and i create a ClusterROle (permissions).
+# I given permissions to the role is For persistentvolumes i given (get,watch,create,delete).
+# It can get the pv and watch the pv, create the pv, delete the pv.
+# why we given create permission is bcs we deploying one application(nfsprovisioner)  
+# so that container has to create a volume so without giving permissions to this container or that application it can create a volume.
+# it's going to create a pv object dynamically in the cluster.
+# we create a ServiceAcoount and we create a ClusterRole with Pv permisions and PVC permissions and storageclasses permissions.
+# And we are binding/linking this service account with clusterrolebinding.(RBAC).
+# Then going to deployment object here we are going to deploy one application using an image so inside the spec block we specify the ServiceAccountName.
+# so this pod will have a access to create a pv dynamically.
+# Here you can see we also created one storage class with nfs-provisioner in last section.
+# If we need to create a pod or a container we need to provide some env variables.
+# In that env i was mentioned provisionername,nfs-server ip, nfs-path(/mnt/share).
+# Whnever i crate a volume what this storage class will do ? this storageclass will do that provisioner.
+# So where and what type of volumes will is created ? it'll create a nfs volumes.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Commands i used for this Dynamic Volumes -:
+---------------------------------------------
+# kubectl apply -f storageclassnfs.yml
+# kubectl get storageclass
+-----------------------------------------------------------------------------------------------------
+# Now create a pvc with "Springapp_pvc.yml"
+---------------------------------------------------------------------------------------
+# Create a pvc without storageclass -:
+# ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodbpvc
+spec: 
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+# I'm not mentioning any stoaregclassname so it'll take default storage class.
+# So now we can create and if our pod requires ReadWriteOnce acces mode we can use this access modes or our pod requires it's supports ReadWriteMany also.
+# Now we deploy our pod along with pvc.
+# kubectl apply -f Springapp_pvc.yml.
+# kubectl get pvc.
+# kubectl describe pvc pvcname.
+# kubectl describe pods -n kube-system.
+# kubectl logs podid -n kube-system.
+
+_________________________________________________________________________________________________________________________________________________________________________________

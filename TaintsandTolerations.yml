@@ -1,0 +1,156 @@
+#                                             Scheduling, Preemption and Eviction / Taints and Tolerations
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# With help of these Nodeselector or affinity, or taints and tolerance, by using we can shedule the pods in specific nodes.
+# -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# > kubernetes sheduler ensures that the right node is selected by checking the node's capacity for cpu and Ram and comparing it to to the pod's resource requests.
+# > The sheduler makes sure that, for each of these resource types, the sum of all resource requests by the pod's conatiner is less than the capacity of the node.
+# > This mechanism ensures that pods end up on nodes with spare resources.
+# ---------------
+# > k8s sheduler's default behaviour works well for most cases -- for example, it ensures  that pods are only placed on nodes that have sufficient free resources, 
+# > it ties to spread pods from the same set( ReplicaSet, StatefulSet, etc) across nodes. it tries to balance out the resource utilization of nodes, etc.
+#------------------------
+# > However, there  are some scenarios when we want our pods to end up on specific nodes.
+# > Forexample -:
+# -------------------
+#         > For ex we have a differnet storages and we have a multiple worker nodes some worker nodes will have a ssd storages.
+#	  > and some worker nodes will have normal storages are attached. 
+#	  > So some of our pods needs iops capabilities for better performance so our pods need to be shedule on specific node.
+#	  > in that case we have some options like NodeSelector, affinity & etc.
+#------------------------------------------------------------
+# > 1) what is NodeSelector -:
+#------------------------------------
+#   > This is a simple pod sheduling feature taht allows sheduling a pod onto a node whose labels match the nodeselector labels specified by the user.
+#	 > So we can add a label to the node and in our pod manifest we can define that as a nodeselector.
+#	   > spec:
+#	       nodeSelector:
+#		        name: nodeone-selector
+#			containers: 
+#	 > This node-selector label should match to the node labels then only it'll shedule the pod on that node.
+#	 > Nodeselector is the simplest pod sceduling constraint in k8s.
+#	 > It's a hard limit, my nodeselector label should matches the node label then only it'll shedule the pod on specific node.
+#-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#	 > we see the labels whatever the lables with (key=value) we have by executing this below command.
+#	 > kubectl get nodes --show-labels.
+#	 > we can add our own labels by executing this below command
+#	 > kubectl label node (nodename) label-key=label-value(this key:value name should anything).
+#------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#     > K8s also offers some advanced scheduling features: node affinity, taints and tolerations.
+#-----------------------------------------------------------------------------------------------------------------------------------------------------
+#     > Node Affinity -: 
+#	 -------------------
+#	  > The affinity it's an advnced feature on k8s, greatly expands the nodeSelector funtionality introducing the following imorovements.
+#	  > Here we can mention a Soft & Hard Sheduling rules.
+#         >  if node has no matching pod label but it still shedule the pod on that label.
+#	  > By using Node Affinity we can define both Sofy limt and HArd limit. and also we can define our conditions more expressively.
+	  
+#	 > NodeAffinity is also uses the labels -:
+#	  -------------------------------------------------
+#        > NodeAffinity is a way to set rules based on which the sheduler can select the nodes for scheduling workload. 
+#        > Node affinity can be thought of as opposite of taints. Taints repel(remove) a certain set of nodes whereas node affinity a certain set of nodes.
+#	   > NodeAffinity is an advanced feature of NodeSelector.
+	
+#	> We have 2 types of Node affinity rules -:
+#	 --------------------------------------------------
+#	  1) Preferred Rules.                        2) Required rules.
+	 
+#	 > 1) Preferred Rule -: (Soft Rule)
+#	 -----------------------------------------
+#	   > preferredDuringSchedulingIgnoredDuringExecution: The scheduler tries to find a node that meets the rule. 
+#	   > If a matching node is not available, the scheduler still schedules the Pod.
+#	   > in a prefered rule(soft rule), a pod will be assigned on a non - matching node if and only if no other node in the cluster matches the specified labels.
+#	   > if i mention PreferedDuringSchedulingIgnoredDUringExecution is a prefered rule affinity. -: if any node has taht label it'll prefered to shedule on that node.
+#	   > if no node with that label it'll ignoreduringexecution which means it'll shedule a any other node.
+	  
+#	 > 2) Required Rule -: ( Hard Rule)
+#	 -------------------------------------------
+#	 > We have two affinities rules namely requiredDuringSchedulingIgnoreDuringExecution and requiredDuringSchedulingRequiredDuringExecution.
+
+#	   > requiredDuringSchedulingIgnoreDuringExecution -:
+#	   --------------------------------------------------------------
+#	   > There are a couple of require rule affinities namely requiredDuringSchedulingIgnoreDuringExecution and requiredDuringSchedulingRequiredDuringExecution.
+#	   > In required rules, if there are no matching nodes, then the pod won't be scheduled. 
+	   
+#	   > requiredDuringSchedulingRequiredDuringExecution -:
+#	   --------------------------------------------------------------------
+#	   > Here the pod will be scheduling only if the node labels specified in the pod spec matches with the labels. it shedules the labels are macthing.
+#	   > But what after shedule the pod if you remove/update the labels in future the pod will be removed.
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#    > You can use the operator field to specify a logical operator for Kubernetes to use when interpreting the rules. 
+#	 > You can use In, NotIn, Exists, DoesNotExist, Gt and Lt.
+	 
+#	 > Example yml -:
+#	 ------------------------
+#	 spec:
+#          affinity:
+#              nodeAffinity:
+#                requiredDuringSchedulingIgnoredDuringExecution:
+#                  nodeSelectorTerms:
+#                  - matchExpressions:
+#                    - key: kubernetes.io/os
+#                      operator: In
+#                      values:
+#                      - linux
+					  
+#     > NodeAffinity and NodeSelector will attract the pods to that nodes.
+#	 > Taints and Tolirations evict the pods.
+#----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+# Taints -: (it's some kind of marking) -:
+# -----------------------------------------------
+# > Taint is a property of node that allows us to repel(remove) a set of pods unless pods explicitily tolerates that taint.
+# > whatever the pods are running are sheduling if we don't wanna run on a specific sheduled nodes example if we don't wanna run pods on master we use tains.
+# >  Unless until our pod tolerates that taint the pod will not schedule on the node.(whatever node has a taint).
+# > we can taint any node 
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# > Taint has 3 Things -:
+# -----------------------------
+#  > Key , Value, and Effect.
+#  > 
+#  > ex -: kubectl taint nodes nodename/id node(Anyname)=value(anyname):NoSchedule/PreferNotSchedule/NoExecute.
+#   ----------------------------------------------------------------------------------------------------------------------------
+#  > The above taint has key=node, value=taintpods and Effect as NoSchedule. 
+#  > These key value pairs are configurable. any pod that doesn't have macthing toleration to this taint will not be scheduled on node1.
+  
+# > we have differnet types of Taint Effects  -:
+# ------------------------------------------------------
+#  1) NoSchedule -: Doesn't schedule a pod without matching tolerations.
+#  2) PreferNotSchedule -: Prefers that the pod without matching toleration be not scheduled on the node. it is a softer version of NoSchedule effect.
+#  3) NoExecute -: Evicts the pods that don't have matching tolerations.
+ 
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# > kubectl get nodes > we can see the nodes 
+# > kubectl describe node node name >  we can see the taints info with Taints Tag under Annotations.
+# > kubectl taint nodes nodename/id node(Anyname)=value(anyname):NoSchedule.
+# ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# > kubectl taint nodes node1 key1=value1:NoSchedule 
+# > Here's an example of a pod that uses tolerations -:
+# ------------------------------------------------------------------
+#apiVersion: v1
+#kind: Pod
+#metadata:
+#  name: nginx
+#  labels:
+#    env: test
+#spec:
+#  containers:
+#  - name: nginx
+#    image: nginx
+#    imagePullPolicy: IfNotPresent
+#  tolerations:
+#  - key: "example-key"
+#    operator: "Exists"
+#	value: "value1"
+#    effect: "NoSchedule"
+	
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# > Now Execute the file. -> kubectl apply -f taints.yml
+#	> kubectl get nodes
+#	> kubectl get pods -o wide 
+#	> kubectl desribe nodes nodename.
+	
+# 	> You specify a toleration for a pod in the PodSpec. Both of the following tolerations "match" the taint created by the kubectl taint line above, and thus a pod with either toleration would be able to schedule onto node1.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+

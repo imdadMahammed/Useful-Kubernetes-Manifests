@@ -49,7 +49,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Contact
 
-For any further queries, you can reach out via GitHub issues or contact me directly at [your-email@example.com].
+For any further queries, you can reach out via GitHub issues or contact me directly at [ikonda.mohd@gmai.com].
 
 Thank you for using or contributing to this repository!
 ```
